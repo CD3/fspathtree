@@ -279,5 +279,29 @@ def test_construct_from_dict():
   assert d['level 1/two'] == 12
 
 
+def test_get_all_leaf_node_paths():
+  d = fspathtree( {'one' : 1, 'level1' : {'two' : 2, 'nums' : [1,2,3],'level2' : {'three' : 3, 'nums' : [1,2,3] } } } )
 
+  paths = d.get_all_leaf_node_paths()
+  assert len(paths) == 9
+  assert d.PathType("/one") in paths
+  assert d.PathType("/level1/two") in paths
+  assert d.PathType("/level1/nums/0") in paths
+  assert d.PathType("/level1/nums/1") in paths
+  assert d.PathType("/level1/nums/2") in paths
+  assert d.PathType("/level1/level2/three") in paths
+  assert d.PathType("/level1/level2/nums/0") in paths
+  assert d.PathType("/level1/level2/nums/1") in paths
+  assert d.PathType("/level1/level2/nums/2") in paths
 
+  paths = d.get_all_leaf_node_paths(as_str=True)
+  assert len(paths) == 9
+  assert "/one" in paths
+  assert "/level1/two" in paths
+  assert "/level1/nums/0" in paths
+  assert "/level1/nums/1" in paths
+  assert "/level1/nums/2" in paths
+  assert "/level1/level2/three" in paths
+  assert "/level1/level2/nums/0" in paths
+  assert "/level1/level2/nums/1" in paths
+  assert "/level1/level2/nums/2" in paths

@@ -22,6 +22,8 @@ class fspathtree:
     if self.tree != self.root and abspath == '/':
       raise RuntimeError("fspathtree: tree initialized with an abspath '/', but the tree and root are not the same.")
 
+    self.get_all_leaf_node_paths = self._instance_get_all_leaf_node_paths
+
   @staticmethod
   def make_path(key):
     '''
@@ -196,19 +198,26 @@ class fspathtree:
       return fspathtree.setitem(tree[parts[0]],parts[1:],value)
 
   @staticmethod
-  def get_all_leaf_node_paths(node, current_path=PathType("/"), paths=list()):
+  def get_all_leaf_node_paths(node, as_str=False, current_path=PathType("/"), paths=None):
     '''
     Returns a list containing the paths to all leaf nodes in the tree.
     '''
-    if type(tree) not in fspathtree.IndexableLeafTypes and hasattr(item,'__getitem__'):
+    if paths is None:
+      paths = list()
+    if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
       try:
-        for i in range(len(tree)):
-          get_all_leaf_node_paths( tree[i], curent_path / str(i), paths )
+        for i in range(len(node)):
+          fspathtree.get_all_leaf_node_paths( node[i], as_str, current_path / str(i), paths )
       except:
-        for k in tree:
-          get_all_leaf_node_paths( tree[k], curent_path / k, paths )
+        for k in node:
+          fspathtree.get_all_leaf_node_paths( node[k], as_str, current_path / k, paths )
     else:
-      paths.append(current_path)
+      if as_str:
+        paths.append(str(current_path))
+      else:
+        paths.append(current_path)
   
-
     return paths
+
+  def _instance_get_all_leaf_node_paths(self, as_str = False, current_path=PathType("/"), paths=None):
+    return fspathtree.get_all_leaf_node_paths(self.tree,as_str,current_path,paths)
