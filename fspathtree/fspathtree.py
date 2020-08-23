@@ -8,7 +8,7 @@ class fspathtree:
   """A small class that wraps a tree data struction and allow accessing the nested elements using filesystem-style paths."""
   DefaultNodeType = dict
   PathType = PurePosixPath
-  IndexableLeafType = (str,bytes)
+  IndexableLeafTypes = [str,bytes]
 
   def __init__(self,tree=DefaultNodeType(),root=None,abspath='/'):
     self.tree = tree
@@ -22,21 +22,31 @@ class fspathtree:
     if self.tree != self.root and abspath == '/':
       raise RuntimeError("fspathtree: tree initialized with an abspath '/', but the tree and root are not the same.")
 
-  def make_path(self,key):
+  @staticmethod
+  def make_path(key):
+    '''
+    Given a string, bytes array, or integer;  return a PathType object representing the path.
+    '''
+    if type(key) in (list,tuple):
+      key = '/'.join(key)
+
     if type(key) in (str,bytes):
       key = re.sub(r'^\/+','/',key) # replace multiple '/' at front with a single '/'. i.e. // -> /
+
     if type(key) in (int,):
       key = str(key)
 
-    return self.PathType(key)
+    path = fspathtree.PathType(key)
+
+    return path
 
 
   def __getitem__(self,key):
     path = self.make_path(key)
 
     if path.is_absolute():
-      item = fspathtree.getitem(self.root,path.relative_to('/').parts)
-      if type(item) not in fspathtree.IndexableLeafType and hasattr(item,'__getitem__'):
+      item = fspathtree.getitem(self.root,path.relative_to('/'))
+      if type(item) not in fspathtree.IndexableLeafTypes and hasattr(item,'__getitem__'):
         return fspathtree(item,root=self.root,abspath=(self.abspath/path).as_posix())
       else:
         return item
@@ -47,15 +57,15 @@ class fspathtree:
     # we can check to see if the path refers to an item in the
     # root tree
     try:
-      item = fspathtree.getitem(self.tree,path.parts)
+      item = fspathtree.getitem(self.tree,path)
     except PathGoesAboveRoot as e:
       if self.abspath == self.PathType("/"):
         raise e
 
-      item = fspathtree.getitem(self.root,(self.abspath/path).relative_to('/').parts)
+      item = fspathtree.getitem(self.root,(self.abspath/path).relative_to('/'))
 
 
-    if type(item) not in fspathtree.IndexableLeafType and hasattr(item,'__getitem__'):
+    if type(item) not in fspathtree.IndexableLeafTypes and hasattr(item,'__getitem__'):
       return fspathtree(item,root=self.root,abspath=(self.abspath/path).as_posix())
     else:
       return item
@@ -65,7 +75,7 @@ class fspathtree:
     path = self.make_path(key)
 
     if path.is_absolute():
-      fspathtree.setitem(self.root,path.relative_to('/').parts,value)
+      fspathtree.setitem(self.root,path.relative_to('/'),value)
       return
 
     # path is relative
@@ -74,29 +84,32 @@ class fspathtree:
     # we can check to see if the path refers to an path in the
     # root tree
     try:
-      fspathtree.setitem(self.tree,path.parts,value)
+      fspathtree.setitem(self.tree,path,value)
     except PathGoesAboveRoot as e:
       if self.abspath == self.PathType("/"):
         raise e
-      fspathtree.setitem(self.root,(self.abspath/path).relative_to('/').parts,value)
+      fspathtree.setitem(self.root,(self.abspath/path).relative_to('/'),value)
 
 
   def update(self,*args,**kwargs):
     self.tree.update(*args,**kwargs)
 
   def path(self):
-    return self.make_path('/'.join(self.normalize_path_parts(self.abspath.parts)))
+    return self.normalize_path(self.abspath)
 
-  def get(self,key,default_value):
+  def get(self,path,default_value):
+    '''
+    Returns the value of the node references by path, or a default value if the node does not exists.
+    '''
     try:
-      return self[key]
+      return self[path]
     except:
       return default_value
 
 
-
   @staticmethod
-  def normalize_path_parts(parts,up="..",current="."):
+  def _normalize_path_parts(parts,up="..",current="."):
+
     if up not in parts and current not in parts:
       return parts
 
@@ -113,10 +126,26 @@ class fspathtree:
 
     return norm_parts
 
+
   @staticmethod
-  def getitem(tree,parts,normalize_path=True):
+  def normalize_path(path,up="..",current="."):
+    return fspathtree.make_path( fspathtree._normalize_path_parts( path.parts, up, current) )
+
+  @staticmethod
+  def getitem(tree,path,normalize_path=True):
+    '''
+    Given a tree and a path, returns the value of the node pointed to by the path. By default, the path will be normalized first.
+    This can be disabled by passing normalize_path=False.
+    '''
+    if type(path) in (list,tuple):
+      parts = path
+    else:
+      if type(path) is not fspathtree.PathType:
+        path = fspathtree.PathType(path)
+      parts = path.parts
+
     if normalize_path:
-      parts = fspathtree.normalize_path_parts(parts)
+      parts = fspathtree._normalize_path_parts(parts)
 
     if parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
@@ -134,12 +163,24 @@ class fspathtree:
     if len(parts) == 1:
       return node
     else:
-      return fspathtree.getitem(node,parts[1:],normalize_path = False)
+      return fspathtree.getitem(node,parts[1:])
 
 
   @staticmethod
-  def setitem(tree,parts,value):
-    parts = fspathtree.normalize_path_parts(parts)
+  def setitem(tree,path,value):
+    '''
+    Given a tree, a path, and a value, sets the value of the node pointed to by the path. If any level of the path does not
+    exists, it is created.
+    '''
+    if type(path) in (list,tuple):
+      parts = path
+    else:
+      if type(path) is not fspathtree.PathType:
+        path = fspathtree.PathType(path)
+      parts = path.parts
+
+    parts = fspathtree._normalize_path_parts(parts)
+
     if parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
@@ -154,3 +195,20 @@ class fspathtree:
 
       return fspathtree.setitem(tree[parts[0]],parts[1:],value)
 
+  @staticmethod
+  def get_all_leaf_node_paths(node, current_path=PathType("/"), paths=list()):
+    '''
+    Returns a list containing the paths to all leaf nodes in the tree.
+    '''
+    if type(tree) not in fspathtree.IndexableLeafTypes and hasattr(item,'__getitem__'):
+      try:
+        for i in range(len(tree)):
+          get_all_leaf_node_paths( tree[i], curent_path / str(i), paths )
+      except:
+        for k in tree:
+          get_all_leaf_node_paths( tree[k], curent_path / k, paths )
+    else:
+      paths.append(current_path)
+  
+
+    return paths
