@@ -47,3 +47,9 @@ Or, even better, using `pipenv`
 ```
 $ pipenv install fspathtree
 ```
+
+## Design
+
+The `fspathtree` is a small wrapper class that can wrap any nested tree data structure. The tree that is wrapped can be accessed with
+the `.tree` attribute. This is an improvement over the old `fspathdict.pdict` class, which stored nodes internally as `fspathdict.pdict` instances
+and required "converting" to and from the standard python dict and list types.
