@@ -30,7 +30,7 @@ class fspathtree:
     Given a string, bytes array, or integer;  return a PathType object representing the path.
     '''
     if type(key) in (list,tuple):
-      key = '/'.join(key)
+      return fspathtree.PathType(*key)
 
     if type(key) in (str,bytes):
       key = re.sub(r'^\/+','/',key) # replace multiple '/' at front with a single '/'. i.e. // -> /
@@ -187,7 +187,14 @@ class fspathtree:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
     if len(parts) == 1:
-      tree[parts[0]] = value
+      try:
+        tree[parts[0]] = value
+      except TypeError as e:
+        # if getting the node fails,
+        # it probably (hopefully) means we have a list
+        # and we need to pass it an integer index
+        tree[int(parts[0])] = value
+
     else:
       # check if item needs to be created
       try:
