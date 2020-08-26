@@ -307,7 +307,42 @@ def test_get_all_leaf_node_paths():
   assert "/level1/level2/nums/2" in paths
 
 def test_static_methods():
+
   d = { 'one' : 1, 'l2' : { 'one' : 1, 'two' : 2, 'l3' : {'one' : 1 } } }
 
   assert fspathtree.getitem( d, 'one' ) == 1
   assert fspathtree.getitem( d, '/one' ) == 1
+
+  fspathtree.setitem(d, "two", 2);
+  fspathtree.setitem(d, "l2/l3/l4/l5/one", 10);
+
+  assert fspathtree.getitem( d, '/two' ) == 2
+  assert fspathtree.getitem( d, '/l2/l3/l4/l5/one' ) == 10
+
+def test_search():
+  t = fspathtree( { 'one' : 1, 'l2' : { 'one' : 1, 'two' : 2, 'l3' : {'one' : 1 } }, 'll2' : {'one' : 11}  } )
+
+  assert t._make_path('/one').match("one")
+  assert not t._make_path('/l2/one').match("/one")
+  assert t._make_path('/l2/one').match("one")
+  assert t._make_path('l2/one').match("one")
+  assert not t._make_path('l2/one').match("/one")
+  assert t._make_path('/l2/one').match("*/one")
+  assert not t._make_path('/l2/l3/one').match("/*/one")
+  assert t._make_path('/l2/l3/one').match("*/one")
+  assert t._make_path('/l2/l3/one').match("l3/one")
+  assert not t._make_path('/l2/l3/one').match("l4/one")
+
+  keys = t.find("/one")
+  assert len(keys) == 1
+
+  keys = t.find("one")
+  assert len(keys) == 4
+
+  keys = t.find("l2/*")
+  assert len(keys) == 2
+
+  keys = t.find("l*/one")
+  assert len(keys) == 3
+
+

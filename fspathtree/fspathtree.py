@@ -23,6 +23,7 @@ class fspathtree:
       raise RuntimeError("fspathtree: tree initialized with an abspath '/', but the tree and root are not the same.")
 
     self.get_all_leaf_node_paths = self._instance_get_all_leaf_node_paths
+    self.find = self._instance_find
 
   # Public Instance API
 
@@ -84,6 +85,14 @@ class fspathtree:
       return default_value
 
 
+  # this is used to allow the same name for instance and static methods
+  def _instance_get_all_leaf_node_paths(self, as_str = False, predicate=None):
+    return fspathtree.get_all_leaf_node_paths(self.tree,as_str,predicate)
+
+
+  def _instance_find(self,pattern):
+    return fspathtree.find(self.tree,pattern)
+
 
 
   # Public Static API
@@ -127,32 +136,12 @@ class fspathtree:
     fspathtree._setitem_from_path_parts(tree,path.parts,value,normalize_path)
 
   @staticmethod
-  def get_all_leaf_node_paths(node, as_str=False, current_path=PathType("/"), paths=None):
-    '''
-    Returns a list containing the paths to all leaf nodes in the tree.
-    '''
-    if paths is None:
-      paths = list()
-    if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
-      try:
-        for i in range(len(node)):
-          fspathtree.get_all_leaf_node_paths( node[i], as_str, current_path / str(i), paths )
-      except:
-        for k in node:
-          fspathtree.get_all_leaf_node_paths( node[k], as_str, current_path / k, paths )
-    else:
-      if as_str:
-        paths.append(str(current_path))
-      else:
-        paths.append(current_path)
-  
-    return paths
+  def get_all_leaf_node_paths(node,as_string = False,predicate = None):
+    return fspathtree._get_all_leaf_node_paths(node,str if as_string else None,predicate)
 
-  # this is used to allow the same name for instance and static methods
-  def _instance_get_all_leaf_node_paths(self, as_str = False, current_path=PathType("/"), paths=None):
-    return fspathtree.get_all_leaf_node_paths(self.tree,as_str,current_path,paths)
-
-
+  @staticmethod
+  def find(tree,pattern,as_string=False):
+    return fspathtree.get_all_leaf_node_paths(tree,as_string,lambda p: p.match(pattern))
 
 
   # Private Methods
@@ -245,5 +234,29 @@ class fspathtree:
         tree[parts[0]] = fspathtree.DefaultNodeType()
 
       fspathtree._setitem_from_path_parts(tree[parts[0]],parts[1:],value,False)
+
+  @staticmethod
+  def _get_all_leaf_node_paths(node, as_=None, predicate = None, current_path=PathType("/"), paths=None):
+    '''
+    Returns a list containing the paths to all leaf nodes in the tree.
+    '''
+    if paths is None:
+      paths = list()
+    if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
+      try:
+        for i in range(len(node)):
+          fspathtree._get_all_leaf_node_paths( node[i], as_, predicate, current_path / str(i), paths )
+      except:
+        for k in node:
+          fspathtree._get_all_leaf_node_paths( node[k], as_, predicate, current_path / k, paths )
+    else:
+      if predicate is None or predicate(current_path):
+        if as_ is None:
+          paths.append(current_path)
+        else:
+          paths.append(as_(current_path))
+  
+    return paths
+
 
 
