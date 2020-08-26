@@ -294,7 +294,7 @@ def test_get_all_leaf_node_paths():
   assert d.PathType("/level1/level2/nums/1") in paths
   assert d.PathType("/level1/level2/nums/2") in paths
 
-  paths = d.get_all_leaf_node_paths(as_str=True)
+  paths = d.get_all_leaf_node_paths(transform=str)
   assert len(paths) == 9
   assert "/one" in paths
   assert "/level1/two" in paths
@@ -319,7 +319,7 @@ def test_static_methods():
   assert fspathtree.getitem( d, '/two' ) == 2
   assert fspathtree.getitem( d, '/l2/l3/l4/l5/one' ) == 10
 
-def test_search():
+def test_searching():
   t = fspathtree( { 'one' : 1, 'l2' : { 'one' : 1, 'two' : 2, 'l3' : {'one' : 1 } }, 'll2' : {'one' : 11}  } )
 
   assert t._make_path('/one').match("one")
@@ -345,4 +345,52 @@ def test_search():
   keys = t.find("l*/one")
   assert len(keys) == 3
 
+def test_new_instances_are_empty():
+  t = fspathtree({'one':1})
+
+  assert len(t.tree) == 1
+
+  t = fspathtree()
+
+  assert len(t.tree) == 0
+
+
+def test_searching_predicates():
+  t = fspathtree()
+
+  t['/l11/l12/l13/one'] = 1
+  t['/l11/l12/l13/two'] = 2
+  t['/l21/l12/l13/two'] = 2
+  t['/l21/l12/l23/two'] = 2
+  t['/l21/l12/l23/three'] = 3
+  t['/l21/l12/l23/four'] = "4"
+
+  keys = t.get_all_leaf_node_paths()
+  assert len(keys) == 6
+
+  keys = t.get_all_leaf_node_paths(predicate = lambda x : str(x).endswith("r"))
+  assert len(keys) == 1
+
+  keys = t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) == str)
+  assert len(keys) == 1
+  assert fspathtree.PathType("/l21/l12/l23/four") in keys
+
+  keys = t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) is int and y < 3)
+  assert len(keys) == 4
+  assert fspathtree.PathType("/l11/l12/l13/one") in keys
+
+
+def test_searching_transforms():
+  t = fspathtree()
+
+  t['/l11/l12/l13/one'] = 1
+  t['/l11/l12/l13/two'] = 2
+  t['/l21/l12/l13/two'] = 2
+  t['/l21/l12/l23/two'] = 2
+  t['/l21/l12/l23/three'] = 3
+  t['/l21/l12/l23/four'] = "4"
+
+  items = t.get_all_leaf_node_paths(transform = lambda k,v: (str(k),v) )
+  assert len(items) == 6
+  assert type(items[0]) == tuple
 

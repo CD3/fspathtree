@@ -1,5 +1,6 @@
 from pathlib import PurePosixPath
 import re
+from inspect import signature
 
 class PathGoesAboveRoot(Exception):
   pass
@@ -10,9 +11,9 @@ class fspathtree:
   PathType = PurePosixPath
   IndexableLeafTypes = [str,bytes]
 
-  def __init__(self,tree=DefaultNodeType(),root=None,abspath='/'):
-    self.tree = tree
-    self.root = root if root is not None else tree
+  def __init__(self,tree=None,root=None,abspath='/'):
+    self.tree = tree if tree is not None else self.DefaultNodeType()
+    self.root = root if root is not None else self.tree
 
     self.abspath = self.PathType(abspath)
     
@@ -86,8 +87,8 @@ class fspathtree:
 
 
   # this is used to allow the same name for instance and static methods
-  def _instance_get_all_leaf_node_paths(self, as_str = False, predicate=None):
-    return fspathtree.get_all_leaf_node_paths(self.tree,as_str,predicate)
+  def _instance_get_all_leaf_node_paths(self, transform = None, predicate=None):
+    return fspathtree.get_all_leaf_node_paths(self.tree,transform,predicate)
 
 
   def _instance_find(self,pattern):
@@ -136,12 +137,14 @@ class fspathtree:
     fspathtree._setitem_from_path_parts(tree,path.parts,value,normalize_path)
 
   @staticmethod
-  def get_all_leaf_node_paths(node,as_string = False,predicate = None):
-    return fspathtree._get_all_leaf_node_paths(node,str if as_string else None,predicate)
+  def get_all_leaf_node_paths(node,transform = None ,predicate = None):
+    if transform is False:
+      transform = None
+    return fspathtree._get_all_leaf_node_paths(node,transform,predicate)
 
   @staticmethod
   def find(tree,pattern,as_string=False):
-    return fspathtree.get_all_leaf_node_paths(tree,as_string,lambda p: p.match(pattern))
+    return fspathtree.get_all_leaf_node_paths(tree,str if as_string else None,lambda p: p.match(pattern))
 
 
   # Private Methods
@@ -236,7 +239,7 @@ class fspathtree:
       fspathtree._setitem_from_path_parts(tree[parts[0]],parts[1:],value,False)
 
   @staticmethod
-  def _get_all_leaf_node_paths(node, as_=None, predicate = None, current_path=PathType("/"), paths=None):
+  def _get_all_leaf_node_paths(node, transform = None, predicate = None, current_path=PathType("/"), paths=None):
     '''
     Returns a list containing the paths to all leaf nodes in the tree.
     '''
@@ -245,16 +248,34 @@ class fspathtree:
     if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
       try:
         for i in range(len(node)):
-          fspathtree._get_all_leaf_node_paths( node[i], as_, predicate, current_path / str(i), paths )
+          fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, current_path / str(i), paths )
       except:
         for k in node:
-          fspathtree._get_all_leaf_node_paths( node[k], as_, predicate, current_path / k, paths )
+          fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, current_path / k, paths )
     else:
-      if predicate is None or predicate(current_path):
-        if as_ is None:
-          paths.append(current_path)
+      add_path = True
+      if predicate is not None:
+        num_args = len(signature(predicate).parameters)
+        if num_args  == 1:
+          add_path = predicate(current_path)
+        elif num_args == 2:
+          add_path = predicate(current_path,node)
         else:
-          paths.append(as_(current_path))
+          raise RuntimeError(f"fspathtree: Predicate function not supported. Predicates may take 1 or 2 arguments. Provided function takes {num_args}.")
+
+      if add_path:
+        if transform is None:
+          paths.append(current_path)
+        elif type(transform) == type:
+          paths.append(transform(current_path))
+        else:
+          num_args = len(signature(transform).parameters)
+          if num_args == 1:
+            paths.append(transform(current_path))
+          elif num_args == 2:
+            paths.append(transform(current_path,node))
+          else:
+            raise RuntimeError(f"fspathtree: Transform function not supported. Transforms may take 1 or 2 arguments. Provided function takes {num_args}.")
   
     return paths
 
