@@ -305,3 +305,9 @@ def test_get_all_leaf_node_paths():
   assert "/level1/level2/nums/0" in paths
   assert "/level1/level2/nums/1" in paths
   assert "/level1/level2/nums/2" in paths
+
+def test_static_methods():
+  d = { 'one' : 1, 'l2' : { 'one' : 1, 'two' : 2, 'l3' : {'one' : 1 } } }
+
+  assert fspathtree.getitem( d, 'one' ) == 1
+  assert fspathtree.getitem( d, '/one' ) == 1
