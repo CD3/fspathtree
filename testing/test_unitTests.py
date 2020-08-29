@@ -1,4 +1,4 @@
-import pytest,pprint
+import pytest,pprint,types
 from fspathtree import fspathtree, PathGoesAboveRoot
 
 def test_fspathtree_wrapping_existing_dict():
@@ -313,6 +313,7 @@ def test_get_all_leaf_node_paths():
   d = fspathtree( {'one' : 1, 'level1' : {'two' : 2, 'nums' : [1,2,3],'level2' : {'three' : 3, 'nums' : [1,2,3] } } } )
 
   paths = d.get_all_leaf_node_paths()
+  paths = list(paths)
   assert len(paths) == 9
   assert d.PathType("/one") in paths
   assert d.PathType("/level1/two") in paths
@@ -325,6 +326,7 @@ def test_get_all_leaf_node_paths():
   assert d.PathType("/level1/level2/nums/2") in paths
 
   paths = d.get_all_leaf_node_paths(transform=str)
+  paths = list(paths)
   assert len(paths) == 9
   assert "/one" in paths
   assert "/level1/two" in paths
@@ -364,15 +366,18 @@ def test_searching():
   assert not t._make_path('/l2/l3/one').match("l4/one")
 
   keys = t.find("/one")
+  assert isinstance( keys, types.GeneratorType )
+
+  keys = list(t.find("/one"))
   assert len(keys) == 1
 
-  keys = t.find("one")
+  keys = list(t.find("one"))
   assert len(keys) == 4
 
-  keys = t.find("l2/*")
+  keys = list(t.find("l2/*"))
   assert len(keys) == 2
 
-  keys = t.find("l*/one")
+  keys = list(t.find("l*/one"))
   assert len(keys) == 3
 
 def test_new_instances_are_empty():
@@ -396,16 +401,19 @@ def test_searching_predicates():
   t['/l21/l12/l23/four'] = "4"
 
   keys = t.get_all_leaf_node_paths()
+  assert isinstance( keys, types.GeneratorType )
+
+  keys = list(t.get_all_leaf_node_paths())
   assert len(keys) == 6
 
-  keys = t.get_all_leaf_node_paths(predicate = lambda x : str(x).endswith("r"))
+  keys = list(t.get_all_leaf_node_paths(predicate = lambda x : str(x).endswith("r")))
   assert len(keys) == 1
 
-  keys = t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) == str)
+  keys = list(t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) == str))
   assert len(keys) == 1
   assert fspathtree.PathType("/l21/l12/l23/four") in keys
 
-  keys = t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) is int and y < 3)
+  keys = list(t.get_all_leaf_node_paths(predicate = lambda x,y : type(y) is int and y < 3))
   assert len(keys) == 4
   assert fspathtree.PathType("/l11/l12/l13/one") in keys
 
@@ -420,7 +428,10 @@ def test_searching_transforms():
   t['/l21/l12/l23/three'] = 3
   t['/l21/l12/l23/four'] = "4"
 
-  items = t.get_all_leaf_node_paths(transform = lambda k,v: (str(k),v) )
+  items = list(t.get_all_leaf_node_paths(transform = lambda k,v: (str(k),v) ))
   assert len(items) == 6
   assert type(items[0]) == tuple
+
+  items = t.get_all_leaf_node_paths(transform = lambda k,v: (str(k),v) )
+  assert type(next(items)) == tuple
 

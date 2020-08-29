@@ -262,45 +262,42 @@ class fspathtree:
 
 
   @staticmethod
-  def _get_all_leaf_node_paths(node, transform = None, predicate = None, current_path=PathType("/"), paths=None):
+  def _get_all_leaf_node_paths(node, transform = None, predicate = None, current_path=PathType("/")):
     '''
     Returns a list containing the paths to all leaf nodes in the tree.
     '''
-    if paths is None:
-      paths = list()
     if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
       try:
         for i in range(len(node)):
-          fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, current_path / str(i), paths )
+          yield from fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, current_path / str(i))
       except:
         for k in node:
-          fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, current_path / k, paths )
+          yield from fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, current_path / k)
     else:
-      add_path = True
+      return_path = True
       if predicate is not None:
         num_args = len(signature(predicate).parameters)
         if num_args  == 1:
-          add_path = predicate(current_path)
+          return_path = predicate(current_path)
         elif num_args == 2:
-          add_path = predicate(current_path,node)
+          return_path = predicate(current_path,node)
         else:
           raise RuntimeError(f"fspathtree: Predicate function not supported. Predicates may take 1 or 2 arguments. Provided function takes {num_args}.")
 
-      if add_path:
+      if return_path:
         if transform is None:
-          paths.append(current_path)
+          yield current_path
         elif type(transform) == type:
-          paths.append(transform(current_path))
+          yield transform(current_path)
         else:
           num_args = len(signature(transform).parameters)
           if num_args == 1:
-            paths.append(transform(current_path))
+            yield transform(current_path)
           elif num_args == 2:
-            paths.append(transform(current_path,node))
+            yield transform(current_path,node)
           else:
             raise RuntimeError(f"fspathtree: Transform function not supported. Transforms may take 1 or 2 arguments. Provided function takes {num_args}.")
   
-    return paths
 
 
 
