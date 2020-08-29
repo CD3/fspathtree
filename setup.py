@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'fspathtree',
   packages = ['fspathtree'],
-  version = '0.2',
+  version = '0.3',
   license='MIT',
   description = 'A small utility for wrapping trees (nested dict/list) that allows filesystem-like path access, including walking up with "../".',
   author = 'CD Clark III',
