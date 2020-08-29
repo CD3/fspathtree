@@ -1,6 +1,7 @@
 from pathlib import PurePosixPath
 import re
 from inspect import signature
+import collections
 
 class PathGoesAboveRoot(Exception):
   pass
@@ -69,6 +70,15 @@ class fspathtree:
         raise e
       fspathtree.setitem(self.root,(self.abspath/path),value)
 
+  def __contains__(self,key):
+    try:
+      self[key]
+      return True
+    except:
+      return False
+
+  def __len__(self):
+    return len(tree)
 
   def update(self,*args,**kwargs):
     self.tree.update(*args,**kwargs)
@@ -119,6 +129,8 @@ class fspathtree:
     # remove the '/' from the beginning of the path if it exists.
     if path.is_absolute():
       path = path.relative_to('/')
+    if str(path) == '' or str(path) == '.':
+      return tree
 
     return fspathtree._getitem_from_path_parts(tree,path.parts,normalize_path)
 
@@ -199,13 +211,18 @@ class fspathtree:
     if parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
-    try:
-      node = tree[parts[0]]
-    except TypeError as e:
-      # if getting the node fails,
-      # it probably means we have a list
-      # and we need to pass it an integer index
-      node = tree[int(parts[0])]
+    if isinstance(tree,collections.abc.Mapping):
+      if parts[0] in tree:
+        node = tree[parts[0]]
+      else:
+        raise KeyError(f"fspathtree: path contained element '{parts[0]}' that does not exits.")
+    elif isinstance(tree,collections.abc.Sequence):
+      if len(tree) > int(parts[0]):
+        node = tree[int(parts[0])]
+      else:
+        raise IndexError(f"fspathtree: path contained index '{parts[0]}' that does not exits.")
+    else:
+      raise RuntimeError(f"fspathree: unrecognized node type '{type(tree)}' is not Mapping of Sequence. Do not know how to get item.")
 
     if len(parts) == 1:
       return node
@@ -221,22 +238,28 @@ class fspathtree:
     if parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
-    if len(parts) == 1:
-      try:
+    if isinstance(tree,collections.abc.Mapping):
+      if len(parts) == 1:
         tree[parts[0]] = value
-      except TypeError as e:
-        # if getting the node fails,
-        # it probably (hopefully) means we have a list
-        # and we need to pass it an integer index
-        tree[int(parts[0])] = value
-    else:
-      # check if item needs to be created
-      try:
-        x = tree[parts[0]]
-      except:
-        tree[parts[0]] = fspathtree.DefaultNodeType()
+      else:
+        if parts[0] not in tree:
+          tree[parts[0]] = fspathtree.DefaultNodeType()
+        fspathtree._setitem_from_path_parts(tree[parts[0]],parts[1:],value,False)
 
-      fspathtree._setitem_from_path_parts(tree[parts[0]],parts[1:],value,False)
+    elif isinstance(tree,collections.abc.Sequence):
+      # if the list does not have enough elements
+      # append None until it does
+      while len(tree) <= int(parts[0]):
+        tree.append(None)
+      if len(parts) == 1:
+        tree[int(parts[0])] = value
+      else:
+        if tree[int(parts[0])] is None:
+          tree[int(parts[0])] = fspathtree.DefaultNodeType()
+        fspathtree._setitem_from_path_parts(tree[int(parts[0])],parts[1:],value,False)
+    else:
+      raise RuntimeError(f"fspathree: unrecognized node type '{type(tree)}' is not Mapping of Sequence. Do not know how to set item.")
+
 
   @staticmethod
   def _get_all_leaf_node_paths(node, transform = None, predicate = None, current_path=PathType("/"), paths=None):

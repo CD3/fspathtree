@@ -48,6 +48,36 @@ def test_fspathtree_creating_nested_dict():
   assert t.tree['one'] == 1
   assert t.tree['level1']['two'] == 2
 
+def test_fspathtree_adding_to_nested_dict():
+  d = {'items' : [ {'x' : 1, 'y' : 2}, {'x' : "one",'y' : "two"} ] }
+
+  t =  fspathtree(d)
+  t['/items/2/x'] = 3
+
+
+  assert len(t['/items'].tree) == 3
+  assert t['/items/0/x'] == 1
+  assert t['/items/1/x'] == "one"
+  assert t['/items/2/x'] == 3
+  assert t['/items/0/y'] == 2
+  assert t['/items/1/y'] == "two"
+
+  t['items/5/z'] = "six"
+  assert len(t['/items'].tree) == 6
+  assert t['/items/3'] is None
+  assert t['/items/4'] is None
+  assert t['/items/5/z'] == "six"
+
+  t['items/0/x'] = "one"
+  assert len(t['/items'].tree) == 6
+  assert t['/items/0/x'] == "one"
+
+  assert type(t.tree['items']) == list
+
+
+
+
+
 def test_fspathtree_wrapping_existing_list():
   d = ['one', 'two', 'three']
   t = fspathtree(d)
