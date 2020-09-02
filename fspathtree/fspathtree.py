@@ -10,7 +10,6 @@ class fspathtree:
   """A small class that wraps a tree data struction and allow accessing the nested elements using filesystem-style paths."""
   DefaultNodeType = dict
   PathType = PurePosixPath
-  IndexableLeafTypes = [str,bytes]
 
   def __init__(self,tree=None,root=None,abspath='/'):
     self.tree = tree if tree is not None else self.DefaultNodeType()
@@ -27,9 +26,19 @@ class fspathtree:
     self.get_all_leaf_node_paths = self._instance_get_all_leaf_node_paths
     self.find = self._instance_find
 
+  @staticmethod
+  def is_leaf(key,node):
+    if type(node) in [str,bytes]:
+      return True
+
+    if isinstance(node,collections.abc.Mapping) or isinstance(node,collections.abc.Sequence):
+      return False
+
+    return True
+
   # Public Instance API
 
-  def __getitem__(self,path):
+  def __getitem__(self,path,wrap_branch_nodes=True):
     path = self._make_path(path)
 
     if path.is_absolute():
@@ -45,10 +54,10 @@ class fspathtree:
         node = fspathtree.getitem(self.root,(self.abspath/path))
 
     # if the item is an indexable node, we want to wrap it in an fspathtree before returning.
-    if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
-      return fspathtree(node,root=self.root,abspath=(self.abspath/path).as_posix())
-    else:
+    if fspathtree.is_leaf(path,node) or wrap_branch_nodes is False:
       return node
+    else:
+      return fspathtree(node,root=self.root,abspath=(self.abspath/path).as_posix())
 
 
   def __setitem__(self,key,value):
@@ -78,7 +87,7 @@ class fspathtree:
       return False
 
   def __len__(self):
-    return len(tree)
+    return len(self.tree)
 
   def update(self,*args,**kwargs):
     self.tree.update(*args,**kwargs)
@@ -266,7 +275,7 @@ class fspathtree:
     '''
     Returns a list containing the paths to all leaf nodes in the tree.
     '''
-    if type(node) not in fspathtree.IndexableLeafTypes and hasattr(node,'__getitem__'):
+    if not fspathtree.is_leaf(current_path,node):
       try:
         for i in range(len(node)):
           yield from fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, current_path / str(i))
