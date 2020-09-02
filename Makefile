@@ -22,3 +22,6 @@ run-tests:
 
 list-requirements:
 	@ pipenv graph | grep '^[^ ]' 
+
+clean:
+	rm -r _* dist *egg-info
