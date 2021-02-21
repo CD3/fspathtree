@@ -435,3 +435,12 @@ def test_searching_transforms():
   items = t.get_all_leaf_node_paths(transform = lambda k,v: (str(k),v) )
   assert type(next(items)) == tuple
 
+
+def test_missing_key_errors():
+  t = fspathtree()
+
+  t['/l11/l12/l13/one'] = 1
+
+  with pytest.raises(KeyError,match=r".*'l12'.*"):
+    t['l12']
+

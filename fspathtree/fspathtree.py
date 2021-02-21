@@ -2,6 +2,7 @@ from pathlib import PurePosixPath
 import re
 from inspect import signature
 import collections
+import copy
 
 class PathGoesAboveRoot(Exception):
   pass
@@ -97,11 +98,11 @@ class fspathtree:
 
   def get(self,path,default_value):
     '''
-    Returns the value of the node references by path, or a default value if the node does not exists.
+    Returns the value of the node references by path, or a default value if the node does not exist.
     '''
     try:
       return self[path]
-    except:
+    except KeyError:
       return default_value
 
 
@@ -134,6 +135,7 @@ class fspathtree:
 
     path may be specified as a string, Path-like object, or list of path elements.
     '''
+    original_path = copy.copy(path)
     path = fspathtree._make_path(path,normalize_path=False)
     # remove the '/' from the beginning of the path if it exists.
     if path.is_absolute():
@@ -141,21 +143,41 @@ class fspathtree:
     if str(path) == '' or str(path) == '.':
       return tree
 
-    return fspathtree._getitem_from_path_parts(tree,path.parts,normalize_path)
+    try:
+      return fspathtree._getitem_from_path_parts(tree,path.parts,normalize_path)
+    except KeyError as e:
+      msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+      raise KeyError(msg)
+    except IndexError as e:
+      msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+      raise KeyError(msg)
+    except Exception as e:
+      raise e
+
 
 
   @staticmethod
   def setitem(tree,path,value,normalize_path=True):
     '''
     Given a tree, a path, and a value, sets the value of the node pointed to by the path. If any level of the path does not
-    exists, it is created.
+    exist, it is created.
     '''
+    original_path = copy.copy(path)
     path = fspathtree._make_path(path,normalize_path=False)
     # remove the '/' from the beginning of the path if it exists.
     if path.is_absolute():
       path = path.relative_to('/')
 
-    fspathtree._setitem_from_path_parts(tree,path.parts,value,normalize_path)
+    try:
+      fspathtree._setitem_from_path_parts(tree,path.parts,value,normalize_path)
+    except KeyError as e:
+      msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+      raise KeyError(msg)
+    except IndexError as e:
+      msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+      raise KeyError(msg)
+    except Exception as e:
+      raise e
 
   @staticmethod
   def get_all_leaf_node_paths(node,transform = None ,predicate = None):
@@ -224,14 +246,14 @@ class fspathtree:
       if parts[0] in tree:
         node = tree[parts[0]]
       else:
-        raise KeyError(f"fspathtree: path contained element '{parts[0]}' that does not exits.")
+        raise KeyError(parts[0])
     elif isinstance(tree,collections.abc.Sequence):
       if len(tree) > int(parts[0]):
         node = tree[int(parts[0])]
       else:
-        raise IndexError(f"fspathtree: path contained index '{parts[0]}' that does not exits.")
+        raise IndexError(parts[0])
     else:
-      raise RuntimeError(f"fspathree: unrecognized node type '{type(tree)}' is not Mapping of Sequence. Do not know how to get item.")
+      raise RuntimeError(f"Unrecognized node type '{type(tree)}' is not Mapping of Sequence.")
 
     if len(parts) == 1:
       return node
