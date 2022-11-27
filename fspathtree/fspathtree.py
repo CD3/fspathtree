@@ -17,7 +17,7 @@ class fspathtree:
     # beccause we want them to be light wrappers around regular
     # types. so, if tree is an fspathtree instance, we want to
     # wrap its tree instead
-    if type(tree) == fspathtree:
+    if isinstance(tree,fspathtree):
         tree = tree.tree
     self.tree = tree if tree is not None else self.DefaultNodeType()
     self.root = root if root is not None else self.tree
@@ -99,9 +99,10 @@ class fspathtree:
   def update(self,*args,**kwargs):
     # if _any_ of the arguments are an fspathtree, then
     # we want to implemented a nested update.
-    if any( [ type(a) == fspathtree for a in args] ):
+    if any( [ isinstance(a,fspathtree) for a in args] ):
         for a in args:
-            a = fspathtree(a) # convert all non-trees to trees
+            if type(a) is dict:
+                a = fspathtree(a) # convert all non-trees to trees, so we can subscript them with path keys
 
             for key in a.get_all_leaf_node_paths():
                 self[key] = a[key]

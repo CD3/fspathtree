@@ -518,11 +518,6 @@ def test_updating_multi_level_trees():
     assert t['/var1'] == "val1"
 
 
-
-
-
-
-
     t2['/l1/l2/l3/items/10'] = '10'
     assert type(t2['/l1/l2/l3/items'].tree) == list
     assert len(t2['/l1/l2/l3/items'].tree) == 11
@@ -531,6 +526,32 @@ def test_updating_multi_level_trees():
     assert t2['/l1/l2/l3/items'].tree[2] == "eight"
     assert t2['/l1/l2/l3/items'].tree[3] == None
     assert t2['/l1/l2/l3/items'].tree[10] == "10"
+
+
+
+    # check that we can derive from fspathtree and this still works
+    class my_fspathtree(fspathtree):
+        def __init__(self,*args,**kwargs):
+            super().__init__(*args,**kwargs)
+
+    
+    t1 = my_fspathtree({'k1':'v1'})
+    t2 = my_fspathtree( {'k2':'v2', 'l1' : {'k1':'v1'}})
+
+    assert 'l1/k1' not in t1
+    assert t2['l1/k1'] == 'v1'
+
+    assert isinstance(t1,my_fspathtree)
+    assert isinstance(t1,fspathtree)
+
+    t1.update(t2)
+
+    assert 'l1/k1' in t1
+    assert t1['l1/k1'] == 'v1'
+    assert t2['l1/k1'] == 'v1'
+
+
+
 
 
 
@@ -562,3 +583,19 @@ def test_constructors():
     assert t3.tree['k1'] == 'v1'
     assert t3.tree['k2'] == 'v2'
     assert t3.tree['k3'] == 'v3'
+
+
+    # check that we can derive from fspathtree and this still works
+    class my_fspathtree(fspathtree):
+        def __init__(self,*args,**kwargs):
+            super().__init__(*args,**kwargs)
+
+
+    d = {'k1':'v1'}
+
+    t = my_fspathtree(d)
+    assert type(t.tree) == dict
+
+    t2 = my_fspathtree(t)
+    assert type(t2.tree) == dict
+
