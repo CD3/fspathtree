@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fspathtree"
-version = "0.5"
+version = "0.6"
 description = "A small utility for wrapping trees (nested dict/list) that allows filesystem-like path access, including walking up with \"../\"."
 authors = ["CD Clark III <clifton.clark@gmail.com>"]
 license = "MIT"
