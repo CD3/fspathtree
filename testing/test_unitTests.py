@@ -1,4 +1,7 @@
-import pytest,pprint,types
+import pytest
+import pprint
+import types
+import pathlib
 from fspathtree import fspathtree, PathGoesAboveRoot
 
 def test_fspathtree_wrapping_existing_dict():
@@ -24,8 +27,33 @@ def test_fspathtree_wrapping_existing_dict():
   assert t.tree['one'] == 1
   assert type(t.tree) == dict
 
+  assert type(d['level1']['nums']) == list
+  assert type(t['/level1/nums']) == fspathtree
+  assert type(t['/level1/nums'].tree) == list
+
+  assert t["/level1/nums/0"] == 1
+  assert t["/level1/nums/1"] == 2
+  assert t["/level1/nums/2"] == 3
+
+  keys = list(t.get_all_leaf_node_paths())
+  assert len(keys) == 9
+  assert type(keys[0]) == pathlib.PurePosixPath
+
+  # add some keys
   d['three'] = 3
   assert t['three'] == 3
+
+  t['/four'] = 4
+  assert d['four'] == 4
+
+  t['/level1/level2/level3/level4'] = [10,20]
+  assert type(d['level1']['level2']['level3']['level4']) == list
+  assert type(t['level1/level2/level3/level4']) == fspathtree
+  assert t['level1/level2/level3/level4/0'] == 10
+  assert t['level1/level2/level3/level4/1'] == 20
+
+
+
 
 def test_fspathtree_creating_nested_dict():
   t = fspathtree()
