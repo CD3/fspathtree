@@ -2,6 +2,7 @@ import pytest
 import pprint
 import types
 import pathlib
+import copy
 from fspathtree import fspathtree, PathGoesAboveRoot
 
 def test_fspathtree_wrapping_existing_dict():
@@ -472,3 +473,92 @@ def test_missing_key_errors():
   with pytest.raises(KeyError,match=r".*'l12'.*"):
     t['l12']
 
+
+def test_updating_multi_level_trees():
+
+    t = fspathtree()
+    t['/l1/l2/l3/val1'] = 'one'
+    t['/l1/l2/l3/val2'] = 'two'
+    t['/l1/l2/l3/items'] = ['three','four']
+
+    assert t['/l1/l2/l3/val1'] == 'one'
+    assert t['/l1/l2/l3/val2'] == 'two'
+    assert t['/l1/l2/l3/items/0'] == 'three'
+    assert t['/l1/l2/l3/items/1'] == 'four'
+
+    t2 = fspathtree()
+    t2['/l1/l2/l3/items'] = ['five','six']
+
+    t.update(t2)
+
+    assert t['/l1/l2/l3/val1'] == 'one'
+    assert t['/l1/l2/l3/val2'] == 'two'
+    assert t['/l1/l2/l3/items/0'] == 'five'
+    assert t['/l1/l2/l3/items/1'] == 'six'
+
+    t2['/l1/l2/l3/items/0'] = 'seven'
+    t2['/l1/l2/l3/items/2'] = 'eight'
+
+    assert type(t2['/l1/l2/l3/items'].tree) == list
+    assert len(t2['/l1/l2/l3/items'].tree) == 3
+
+    d = { 'l1' : { 'l2' : {'val1' : 'nine' }, 'items' : [0,1,2]} }
+
+
+    t.update(t2,d,var1='val1')
+
+    assert t['/l1/l2/val1'] == "nine"
+    assert t['/l1/items/0'] == 0
+    assert t['/l1/items/1'] == 1
+    assert t['/l1/items/2'] == 2
+    assert t['/l1/l2/l3/val1'] == "one"
+    assert t['/l1/l2/l3/items/0'] == "seven"
+    assert t['/l1/l2/l3/items/1'] == "six"
+    assert t['/l1/l2/l3/items/2'] == "eight"
+    assert t['/var1'] == "val1"
+
+
+
+
+
+
+
+    t2['/l1/l2/l3/items/10'] = '10'
+    assert type(t2['/l1/l2/l3/items'].tree) == list
+    assert len(t2['/l1/l2/l3/items'].tree) == 11
+    assert t2['/l1/l2/l3/items'].tree[0] == "seven"
+    assert t2['/l1/l2/l3/items'].tree[1] == "six"
+    assert t2['/l1/l2/l3/items'].tree[2] == "eight"
+    assert t2['/l1/l2/l3/items'].tree[3] == None
+    assert t2['/l1/l2/l3/items'].tree[10] == "10"
+
+
+
+
+
+def test_constructors():
+    d = {'k1':'v1'}
+
+    t = fspathtree(d)
+    assert type(t.tree) == dict
+
+    t2 = fspathtree(t)
+    assert type(t2.tree) == dict
+
+    t2['/k2'] = 'v2'
+
+    assert len(d) == 2
+    assert d['k2'] == 'v2'
+
+    t3 = fspathtree(copy.deepcopy(t))
+
+    t3['/k3'] = 'v3'
+
+    assert len(d) == 2
+    assert d['k2'] == 'v2'
+
+
+    assert len(t3.tree) == 3
+    assert t3.tree['k1'] == 'v1'
+    assert t3.tree['k2'] == 'v2'
+    assert t3.tree['k3'] == 'v3'
