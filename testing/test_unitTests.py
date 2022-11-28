@@ -3,7 +3,7 @@ import pprint
 import types
 import pathlib
 import copy
-from fspathtree import fspathtree, PathGoesAboveRoot
+from fspathtree import fspathtree, PathGoesAboveRoot, NodeError, InvalidIndexError
 
 def test_fspathtree_wrapping_existing_dict():
   d = {'one' : 1, 'level1' : {'two' : 2, 'nums' : [1,2,3],'level3' : {'three' : 3}}, 'nums' : [1,2,3] }
@@ -550,7 +550,149 @@ def test_updating_multi_level_trees():
     assert t1['l1/k1'] == 'v1'
     assert t2['l1/k1'] == 'v1'
 
+    class MyType:
+        pass
 
+    t1 = my_fspathtree({'l1' : {'k1':MyType()}})
+    t2 = my_fspathtree({'l1' : {'k1':['1','2']}})
+
+    assert type(t1['/l1/k1']) == MyType
+
+    t1.update(t2)
+
+    assert t1['/l1/k1/0'] == '1'
+    assert t1['/l1/k1/1'] == '2'
+    assert type(t1['/l1/k1'].tree) == list
+
+
+
+
+
+def test_accessing_and_creating_paths_deeper_than_leaf_nodes():
+    # We can easily create nested structures by just setting elements
+    # with a nested path. The parents will be created automatically.
+    t1 = fspathtree()
+    t1['l1/l2/l3/v1'] = 1
+    assert t1['l1/l2/l3/v1'] == 1
+
+    # We can change the volue of any *existing* non-leaf note easily too.
+    t1['l1/l2/l3'] = 1
+    assert t1['l1/l2/l3'] == 1
+
+    t1['l1/l2/l3'] = [0,1]
+    assert t1['l1/l2/l3/0'] == 0
+    assert t1['l1/l2/l3/1'] == 1
+    assert type(t1['l1/l2/l3'].tree) == list
+    assert type(t1['l1/l2'].tree) == dict
+
+    # If we try to access elements of non-leaf nodes that don't
+    # exist, we should get a Key error
+    with pytest.raises(Exception) as e_info:
+        t1['l2']
+    assert e_info.type == KeyError
+    assert str(e_info.value).strip('"') == "Could not find path element 'l2' while parsing path 'l2'"
+
+    with pytest.raises(Exception) as e_info:
+        t1['l1/l3/l3']
+    assert e_info.type == KeyError
+    assert str(e_info.value).strip('"') == "Could not find path element 'l3' while parsing path 'l1/l3/l3'"
+
+    with pytest.raises(Exception) as e_info:
+        t1['l1/l2/l2']
+    assert e_info.type == KeyError
+    assert str(e_info.value).strip('"') == "Could not find path element 'l2' while parsing path 'l1/l2/l2'"
+
+    # Or an index error for lists
+    with pytest.raises(Exception) as e_info:
+        t1['l1/l2/l3/2']
+    assert e_info.type == IndexError
+    assert str(e_info.value).strip('"') == "Could not find path element '2' while parsing path 'l1/l2/l3/2'"
+
+
+    t1['l1/l2'] = None
+    with pytest.raises(Exception) as e_info:
+        t1['l1/l2/l3']
+    assert e_info.type == NodeError
+    assert str(e_info.value).strip('"') == "Unknown parent node type (<class 'NoneType'>) found at 'l1/l2' while traversing path 'l1/l2/l3'. This likely means you are trying to access an element beyond a current leaf node."
+
+    t1['l1/l2'] = 1
+    with pytest.raises(Exception) as e_info:
+        t1['l1/l2/l3']
+    assert e_info.type == NodeError
+    assert str(e_info.value).strip('"') == "Unknown parent node type (<class 'int'>) found at 'l1/l2' while traversing path 'l1/l2/l3'. This likely means you are trying to access an element beyond a current leaf node."
+
+
+    t1['l1/l2/l3'] = 2
+    assert type(t1['l1/l2'].tree) == dict
+    assert type(t1['l1/l2/l3']) == int
+    assert t1['l1/l2/l3'] == 2
+
+
+    t1['l1/l2/l3/1'] = 3
+    assert type(t1['l1/l2/l3'].tree) == list
+    assert t1['l1/l2/l3/0'] == None
+    assert t1['l1/l2/l3/1'] == 3
+
+
+
+def test_using_list_and_dict_nodes():
+    t1 = fspathtree()
+
+
+    t1['l1/l2'] = [1,2]
+
+    assert type(t1['/l1/l2'].tree) == list
+    assert type(t1['/l1/l2/0']) == int
+    assert type(t1['/l1/l2/1']) == int
+    assert t1['/l1/l2/0'] == 1
+    assert t1['/l1/l2/1'] == 2
+
+    with pytest.raises(Exception) as e_info:
+        t1['/l1/l2/val'] = 3
+    assert e_info.type == IndexError
+    assert str(e_info.value).strip('"') == "Error while parsing path '/l1/l2/val'. Non-numeric index 'val' used to index Sequence node."
+
+    assert '/l1/l2' in t1
+    assert '/l1/l2/0' in t1
+    assert '/l1/l2/1' in t1
+    assert '/l1/l2/val' not in t1
+
+
+    t1 = fspathtree([1,2])
+    assert type(t1.tree) == list
+    assert t1['/0'] == 1
+    assert t1['/1'] == 2
+
+    with pytest.raises(Exception) as e_info:
+        t1['/val'] = 3
+    assert e_info.type == IndexError
+    assert str(e_info.value).strip('"') == "Error while parsing path '/val'. Non-numeric index 'val' used to index Sequence node."
+
+    assert type(t1.tree) == list
+    assert t1['/0'] == 1
+    assert t1['/1'] == 2
+
+    t1 = fspathtree()
+    t1['l1/l2/0'] = 1
+    t1['l1/l2/1'] = 2
+
+    assert type(t1['/l1/l2'].tree) == list
+    assert type(t1['/l1/l2/0']) == int
+    assert type(t1['/l1/l2/1']) == int
+    assert t1['/l1/l2/0'] == 1
+    assert t1['/l1/l2/1'] == 2
+
+    t1 = fspathtree()
+    t1['l1/l2/0/0'] = 1
+    t1['l1/l2/0/1'] = 2
+    t1['l1/l2/1/0'] = 3
+    t1['l1/l2/1/1'] = 4
+
+    assert type(t1['/l1/l2'].tree) == list
+    assert type(t1['/l1/l2/0'].tree) == list
+    assert type(t1['/l1/l2/1'].tree) == list
+    assert t1['/l1/l2/0'].tree == [1,2]
+    assert t1['/l1/l2/1'].tree == [3,4]
 
 
 

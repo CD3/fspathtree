@@ -6,10 +6,23 @@ import copy
 
 class PathGoesAboveRoot(Exception):
   pass
+class CannotCreateParentNode(Exception):
+  pass
+class InvalidIndexError(Exception):
+  pass
+class UnrecognizedParentNodeType(Exception):
+  def __init__(self,node_type,remaining_parts):
+    self.node_type = node_type
+    self.remaining_parts = remaining_parts
+
+class NodeError(Exception):
+  pass
 
 class fspathtree:
   """A small class that wraps a tree data struction and allow accessing the nested elements using filesystem-style paths."""
-  DefaultNodeType = dict
+  MappingNodeType = dict
+  SequenceNodeType = list
+  DefaultNodeType = MappingNodeType
   PathType = PurePosixPath
 
   def __init__(self,tree=None,root=None,abspath='/'):
@@ -34,6 +47,12 @@ class fspathtree:
     self.find = self._instance_find
 
   @staticmethod
+  def _make_node_type_for_key(key):
+      if key.isnumeric():
+          return fspathtree.SequenceNodeType()
+      return fspathtree.MappingNodeType()
+
+  @staticmethod
   def is_leaf(key,node):
     if type(node) in [str,bytes]:
       return True
@@ -49,7 +68,7 @@ class fspathtree:
     path = self._make_path(path)
 
     if path.is_absolute():
-      node = fspathtree.getitem(self.root,path,normalize_path=True)
+      node = fspathtree.getitem(self.root,path)
     else:
       try:
         node = fspathtree.getitem(self.tree,path)
@@ -68,6 +87,12 @@ class fspathtree:
 
 
   def __setitem__(self,key,value):
+    '''
+    Set the element located at `key` to `value`.
+
+    The `key` is treated as a filesystem-like path, with parts separated by '/' characters.
+    If the path represented by `key` includes "parents" that do not exists, they will be created.
+    '''
     path = self._make_path(key)
 
     if path.is_absolute():
@@ -150,10 +175,9 @@ class fspathtree:
     return fspathtree.PathType(*parts)
 
   @staticmethod
-  def getitem(tree,path,normalize_path=True):
+  def getitem(tree,path):
     '''
-    Given a tree and a path, returns the value of the node pointed to by the path. By default, the path will be normalized first.
-    This can be disabled by passing normalize_path=False.
+    Given a tree and a path, returns the value of the node pointed to by the path. The path will be normalized first.
 
     path may be specified as a string, Path-like object, or list of path elements.
     '''
@@ -166,23 +190,27 @@ class fspathtree:
       return tree
 
     try:
-      return fspathtree._getitem_from_path_parts(tree,path.parts,normalize_path)
+      return fspathtree._getitem_from_path_parts(tree,path.parts)
     except KeyError as e:
       msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
       raise KeyError(msg)
     except IndexError as e:
       msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
-      raise KeyError(msg)
+      raise IndexError(msg)
+    except InvalidIndexError as e:
+      msg = f"Error while parsing '{original_path}'." + str(e)
+      raise IndexError(msg)
     except Exception as e:
       raise e
 
 
 
   @staticmethod
-  def setitem(tree,path,value,normalize_path=True):
+  def setitem(tree,path,value):
     '''
     Given a tree, a path, and a value, sets the value of the node pointed to by the path. If any level of the path does not
-    exist, it is created.
+    exist, it is created. If the _root_ node type needs to be changed to set the value, then a new tree with the value set
+    is returned.
     '''
     original_path = copy.copy(path)
     path = fspathtree._make_path(path,normalize_path=False)
@@ -191,13 +219,16 @@ class fspathtree:
       path = path.relative_to('/')
 
     try:
-      fspathtree._setitem_from_path_parts(tree,path.parts,value,normalize_path)
+      return fspathtree._setitem_from_path_parts(tree,path.parts,value)
     except KeyError as e:
       msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
       raise KeyError(msg)
     except IndexError as e:
       msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
       raise KeyError(msg)
+    except InvalidIndexError as e:
+      msg = f"Error while parsing path '{original_path}'. " + str(e)
+      raise IndexError(msg)
     except Exception as e:
       raise e
 
@@ -238,6 +269,10 @@ class fspathtree:
 
   @staticmethod
   def _normalize_path_parts(parts,up="..",current="."):
+    '''
+    Normalize a list of path parts. i.e. remove ".." and "." elements
+    while maintaining the same path.
+    '''
 
     if up not in parts and current not in parts:
       return parts
@@ -256,62 +291,125 @@ class fspathtree:
     return norm_parts
 
   @staticmethod
-  def _getitem_from_path_parts(tree,parts,normalize_path=True):
+  def _getitem_from_path_parts(tree,path_parts):
+    '''
+    @param tree           A nested Mapping/Sequence (i.e. dict/list) object that is being accessed.
+    @param path_parts     A list of path elements identifying the location of the element being accessed.
+    '''
+    # normalize the path before traversing
+    path_parts = fspathtree._normalize_path_parts(path_parts)
 
-    if normalize_path:
-      parts = fspathtree._normalize_path_parts(parts)
-
-    if parts is None:
+    if path_parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
-    if isinstance(tree,collections.abc.Mapping):
-      if parts[0] in tree:
-        node = tree[parts[0]]
-      else:
-        raise KeyError(parts[0])
-    elif isinstance(tree,collections.abc.Sequence):
-      if len(tree) > int(parts[0]):
-        node = tree[int(parts[0])]
-      else:
-        raise IndexError(parts[0])
-    else:
-      raise RuntimeError(f"Unrecognized node type '{type(tree)}' is not Mapping of Sequence.")
+    try:
+        return fspathtree.__getitem_from_path_parts_imp(tree,path_parts)
+    except UnrecognizedParentNodeType as e:
+        # if at any point during the traversal we run into a node that we cannot figure out
+        # how to subscript. we will throw an UnrecognizedParentNodeType esception. However,
+        # we don't want to throw that to the caller, becasue it will not have any information
+        # about where in the path the error occured. So, we will catch this exception,
+        # figure out where it happened, and throw a nicer error.
+        error_node_path_parts = [ p for p in path_parts if p not in e.remaining_parts]
+        raise NodeError(f"Unknown parent node type ({e.node_type}) found at '{'/'.join(error_node_path_parts)}' while traversing path '{'/'.join(path_parts)}'. This likely means you are trying to access an element beyond a current leaf node.")
 
-    if len(parts) == 1:
+  def __getitem_from_path_parts_imp(tree,path_parts):
+    if isinstance(tree,collections.abc.Mapping):
+      if path_parts[0] in tree:
+        node = tree[path_parts[0]]
+      else:
+        raise KeyError(path_parts[0])
+    elif isinstance(tree,collections.abc.Sequence):
+      if len(tree) > int(path_parts[0]):
+        node = tree[int(path_parts[0])]
+      else:
+        raise IndexError(path_parts[0])
+    else:
+      raise UnrecognizedParentNodeType(type(tree), path_parts)
+
+    if len(path_parts) == 1:
       return node
     else:
-      return fspathtree._getitem_from_path_parts(node,parts[1:],False)
+      return fspathtree.__getitem_from_path_parts_imp(node,path_parts[1:])
+
 
   @staticmethod
-  def _setitem_from_path_parts(tree,parts,value,normalize_path=True):
+  def _setitem_from_path_parts(tree,path_parts,value):
+    '''
+    Set the value of a tree branch located at the path given by `path_parts` to the given value.
+    Any missing "parents" of the path are created.
 
-    if normalize_path:
-      parts = fspathtree._normalize_path_parts(parts)
+    @param tree           A nested Mapping/Sequenhe (i.e. dict/list) object that is being accessed.
+    @param path_parts     A list of path elements identifying the location of the element being accessed.
+    @param _root          Implementation detail. Do not use.
+    '''
 
-    if parts is None:
+    # If _root is true, it means this is the _first_ call and we need to normalize the path
+    path_parts = fspathtree._normalize_path_parts(path_parts)
+
+    if path_parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
+    
+    fspathtree._setitem_from_path_parts_imp(tree,path_parts,value)
 
+
+
+
+  @staticmethod
+  def _setitem_from_path_parts_imp(tree,path_parts,value):
+    key = path_parts[0]
+    # if the tree is a dict, then add the path as a key
     if isinstance(tree,collections.abc.Mapping):
-      if len(parts) == 1:
-        tree[parts[0]] = value
+      if len(path_parts) == 1:
+        tree[key] = value
       else:
-        if parts[0] not in tree:
-          tree[parts[0]] = fspathtree.DefaultNodeType()
-        fspathtree._setitem_from_path_parts(tree[parts[0]],parts[1:],value,False)
+        if key not in tree:
+          tree[key] = fspathtree._make_node_type_for_key(path_parts[1])
+        result = fspathtree._setitem_from_path_parts_imp(tree[key],path_parts[1:],value)
+        if result is not None:
+            tree[key] = result
+            fspathtree._setitem_from_path_parts_imp(tree[key],path_parts[1:],value)
 
+
+    # if the tree is a dict, then add the path as an elment of the list with given index
     elif isinstance(tree,collections.abc.Sequence):
+      # check that the path element is an integer.
+      # if it is not, then we want to convert the list to a dict
+      # and tell the caller to try again...
+      if not key.isnumeric():
+          raise InvalidIndexError(f"Non-numeric index '{key}' used to index Sequence node.")
+
+      key = int(key)
+
       # if the list does not have enough elements
       # append None until it does
-      while len(tree) <= int(parts[0]):
+      while len(tree) <= key:
         tree.append(None)
-      if len(parts) == 1:
-        tree[int(parts[0])] = value
+      if len(path_parts) == 1:
+        tree[key] = value
       else:
-        if tree[int(parts[0])] is None:
-          tree[int(parts[0])] = fspathtree.DefaultNodeType()
-        fspathtree._setitem_from_path_parts(tree[int(parts[0])],parts[1:],value,False)
+        if tree[key] is None:
+          tree[key] = fspathtree._make_node_type_for_key(path_parts[1])
+        result = fspathtree._setitem_from_path_parts_imp(tree[key],path_parts[1:],value)
+        if result is not None:
+            tree[key] = result
+            fspathtree._setitem_from_path_parts_imp(tree[key],path_parts[1:],value)
     else:
-      raise RuntimeError(f"fspathree: unrecognized node type '{type(tree)}' is not Mapping of Sequence. Do not know how to set item.")
+      # if we are here, then it means this node has _previously_ been set to a scalar.
+      # i.e.
+      # t['/level1/level2'] = 1
+      # t['/level1/level2/level3'] = 1 # level2 is not a dict or list!
+      # we want to support this, so we need to convert the node. if the path
+      # element is an int (or convertable to an int), then we want to replace
+      # the node with a list, otherwise, we will replace it with a dict.
+      # we will return an empty version of the new node type so that the caller (above)
+      # can replace the node and try again.
+      if path_parts[0].isnumeric():
+          return fspathtree.SequenceNodeType()
+      return fspathtree.MappingNodeType()
+      raise CannotCreateParentNode(f"fspathree: unrecognized node type '{type(tree)}' is not Mapping or Sequence. Do not know how to set item.")
+
+
 
 
   @staticmethod
