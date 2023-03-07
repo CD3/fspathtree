@@ -155,11 +155,19 @@ class fspathtree:
 
   # this is used to allow the same name for instance and static methods
   def _instance_get_all_leaf_node_paths(self, transform = None, predicate=None):
-    return fspathtree.get_all_leaf_node_paths(self.tree,transform,predicate)
+    root_path = fspathtree.PathType("")
+    if self.tree == self.root:
+        root_path = fspathtree.PathType("/")
+
+    return fspathtree.get_all_leaf_node_paths(self.tree,transform,predicate,root_path=root_path)
 
 
   def _instance_find(self,pattern):
-    return fspathtree.find(self.tree,pattern)
+    root_path = fspathtree.PathType("")
+    if self.tree == self.root:
+        root_path = fspathtree.PathType("/")
+
+    return fspathtree.find(self.tree,pattern,root_path=root_path)
 
 
 
@@ -233,14 +241,14 @@ class fspathtree:
       raise e
 
   @staticmethod
-  def get_all_leaf_node_paths(node,transform = None ,predicate = None):
+  def get_all_leaf_node_paths(node,transform = None ,predicate = None, root_path=PathType()):
     if transform is False:
       transform = None
-    return fspathtree._get_all_leaf_node_paths(node,transform,predicate)
+    return fspathtree._get_all_leaf_node_paths(node,transform,predicate,root_path)
 
   @staticmethod
-  def find(tree,pattern,as_string=False):
-    return fspathtree.get_all_leaf_node_paths(tree,str if as_string else None,lambda p: p.match(pattern))
+  def find(tree,pattern,as_string=False,root_path=PathType()):
+    return fspathtree.get_all_leaf_node_paths(tree,str if as_string else None,lambda p: p.match(pattern),root_path=root_path)
 
 
   # Private Methods
@@ -413,39 +421,39 @@ class fspathtree:
 
 
   @staticmethod
-  def _get_all_leaf_node_paths(node, transform = None, predicate = None, current_path=PathType("/")):
+  def _get_all_leaf_node_paths(node, transform = None, predicate = None, root_path=PathType()):
     '''
     Returns a list containing the paths to all leaf nodes in the tree.
     '''
-    if not fspathtree.is_leaf(current_path,node):
+    if not fspathtree.is_leaf(root_path,node):
       try:
         for i in range(len(node)):
-          yield from fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, current_path / str(i))
+          yield from fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, root_path / str(i))
       except:
         for k in node:
-          yield from fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, current_path / k)
+          yield from fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, root_path / k)
     else:
       return_path = True
       if predicate is not None:
         num_args = len(signature(predicate).parameters)
         if num_args  == 1:
-          return_path = predicate(current_path)
+          return_path = predicate(root_path)
         elif num_args == 2:
-          return_path = predicate(current_path,node)
+          return_path = predicate(root_path,node)
         else:
           raise RuntimeError(f"fspathtree: Predicate function not supported. Predicates may take 1 or 2 arguments. Provided function takes {num_args}.")
 
       if return_path:
         if transform is None:
-          yield current_path
+          yield root_path
         elif type(transform) == type:
-          yield transform(current_path)
+          yield transform(root_path)
         else:
           num_args = len(signature(transform).parameters)
           if num_args == 1:
-            yield transform(current_path)
+            yield transform(root_path)
           elif num_args == 2:
-            yield transform(current_path,node)
+            yield transform(root_path,node)
           else:
             raise RuntimeError(f"fspathtree: Transform function not supported. Transforms may take 1 or 2 arguments. Provided function takes {num_args}.")
   

@@ -741,3 +741,29 @@ def test_constructors():
     t2 = my_fspathtree(t)
     assert type(t2.tree) == dict
 
+def test_getting_leaf_nodes():
+  d = {'one' : 1, 'level1' : {'two' : 2, 'nums' : [1,2,3],'level3' : {'three' : 3}}, 'nums' : [1,2,3] }
+  t = fspathtree(d)
+
+
+  keys = list(t.get_all_leaf_node_paths())
+
+  assert len(keys) == 9
+  assert keys[0] in t
+  assert keys[1] in t
+  assert keys[2] in t
+
+  assert fspathtree.PathType("/one") in keys
+  assert fspathtree.PathType("/level1/two") in keys
+
+  keys = list(t['level1'].get_all_leaf_node_paths())
+
+
+  assert len(keys) == 5
+  assert keys[0] in t['level1']
+  assert keys[1] in t['level1']
+  assert keys[2] in t['level1']
+
+  assert fspathtree.PathType("two") in keys
+  assert fspathtree.PathType("nums/0") in keys
+
