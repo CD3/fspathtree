@@ -38,7 +38,7 @@ script=$(find ./ -path ./externals -prune -o -name 'pre-tag-release.sh' -print)
 [[ $script != "" ]] || echo "Did NOT find a script to run."
 
 echo "tagging with ${tag}"
-sed -i "s|version\s*=\s*'[^']\+'|version = '${tag}'|" ./pyproject.toml
+sed -i "s|version\s*=\s*\"[^']\+\"|version = \"${tag}\"|" ./pyproject.toml
 git add pyproject.toml
 git commit -m "houskeeping: update version number in pyproject.toml"
 git tag -a ${tag}
