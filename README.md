@@ -37,6 +37,44 @@ Example:
   assert x['/time/N'] == 50
 ```
 
+## API
+
+The `fspathtree` class can be default constructed, with a `dict`, or with another `fspathtree`
+```python
+t1 = fspathtree()
+t2 = fspathtree({'one':1})
+t3 = fspathtree(t2)
+```
+
+Elements in the tree can be tested for presense using the `in` operator. They can be accessed with the
+`__call__` operator or the `get(...)` method.
+```
+t = fspathtree({'one':{'two': 2}})
+
+assert '/one/two' in t
+assert t['/one/two'] == 2
+assert '/one/three' not in t
+
+t['/one/three'] = 3
+assert '/one/three' in t
+assert t['/one/three'] == 3
+
+assert t.get('/one/three', None) == 3
+assert t.get('/one/missing', None) is None
+```
+The `get_all_paths()` method returns a list of all paths in the tree (it actually returns a generator).
+`get_all_leaf_node_paths()` returns a list of only leaf node paths. Both accept a predicate that can
+be used to filer the paths that are returned.
+```python
+t = fspathtree({'one':{'two': 2}})
+
+paths = list( t.get_all_paths() ) # returns [PathType('/'), PathType('/one'), PathType('two')]
+paths = list( t.get_all_leafe_node_paths() ) # returns [PathType('two')]
+paths = list( t.get_all_paths(predicate p: p.name == 'one') ) # returns [ PathType('/one')]
+
+```
+
+
 ## Install
 
 You can install the latest release with `pip`.
@@ -46,6 +84,10 @@ $ pip install fspathtree
 Or, even better, using `pipenv`
 ```
 $ pipenv install fspathtree
+```
+Or, even better better, using `poetry`
+```
+$ poetry add fspathtree
 ```
 
 ## Design
