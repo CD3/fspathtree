@@ -43,6 +43,7 @@ class fspathtree:
     if self.tree != self.root and abspath == '/':
       raise RuntimeError("fspathtree: tree initialized with an abspath '/', but the tree and root are not the same.")
 
+    self.get_all_paths = self._instance_get_all_paths
     self.get_all_leaf_node_paths = self._instance_get_all_leaf_node_paths
     self.find = self._instance_find
 
@@ -53,7 +54,8 @@ class fspathtree:
       return fspathtree.MappingNodeType()
 
   @staticmethod
-  def is_leaf(key,node):
+  def is_leaf(node):
+    '''Return true if node is a leaf. i.e. not a mapping or list.'''
     if type(node) in [str,bytes]:
       return True
 
@@ -65,6 +67,11 @@ class fspathtree:
   # Public Instance API
 
   def __getitem__(self,path,wrap_branch_nodes=True):
+    '''
+     Return node located at `path`.
+
+     `path` is a '/' separated list of keys/indices to the node.
+    '''
     path = self._make_path(path)
 
     if path.is_absolute():
@@ -80,20 +87,20 @@ class fspathtree:
         node = fspathtree.getitem(self.root,(self.abspath/path))
 
     # if the item is an indexable node, we want to wrap it in an fspathtree before returning.
-    if fspathtree.is_leaf(path,node) or wrap_branch_nodes is False:
+    if fspathtree.is_leaf(node) or wrap_branch_nodes is False:
       return node
     else:
       return fspathtree(node,root=self.root,abspath=(self.abspath/path).as_posix())
 
 
-  def __setitem__(self,key,value):
+  def __setitem__(self,path,value):
     '''
-    Set the element located at `key` to `value`.
+    Set the element located at `path` to `value`.
 
-    The `key` is treated as a filesystem-like path, with parts separated by '/' characters.
-    If the path represented by `key` includes "parents" that do not exists, they will be created.
+    The `path` is treated as a filesystem-like path, with parts separated by '/' characters.
+    If the path represented by `path` includes "parents" that do not exists, they will be created.
     '''
-    path = self._make_path(key)
+    path = self._make_path(path)
 
     if path.is_absolute():
       fspathtree.setitem(self.root,path,value)
@@ -111,9 +118,9 @@ class fspathtree:
         raise e
       fspathtree.setitem(self.root,(self.abspath/path),value)
 
-  def __contains__(self,key):
+  def __contains__(self,path):
     try:
-      self[key]
+      self[path]
       return True
     except:
       return False
@@ -122,6 +129,13 @@ class fspathtree:
     return len(self.tree)
 
   def update(self,*args,**kwargs):
+    '''
+    Update tree with entries from another fspathtree and/or dict/list.
+
+    Note: if an fspathtree is passed as an argument, then the tree is updated recursively. If a dict is passed,
+    then the standard dict.update(...) method is used. This means that tree branches will be overwritten if
+    passing a plain dict.
+    '''
     # if _any_ of the arguments are an fspathtree, then
     # we want to implemented a nested update.
     if any( [ isinstance(a,fspathtree) for a in args] ):
@@ -141,6 +155,25 @@ class fspathtree:
         self.tree.update(*args,**kwargs)
 
   def path(self):
+    '''
+    Return absolute path to the current node.
+
+    Note that leaf notes are returned as thier value and lose knowlege of being part
+    of a "tree". For example, this does not work
+
+        tree['/one/two/three'] = 3
+        assert tree['/one/two/three'].path() == '/one/two/three'
+
+    because the call to tree['/one/two/three'] returns the integer 3.
+    i.e. it does not return a proxy type that keeps track of the tree.
+
+    If you want tree values that 'know' about their location in the
+    tree, use a special key name for values
+
+        tree['/one/two/three/@value'] = 3
+        assert tree['/one/two/three'].path() == '/one/two/three'
+        assert tree['/one/two/three'][@value] == 3
+    '''
     return self.normalize_path(self.abspath)
 
   def get(self,path,default_value):
@@ -154,6 +187,13 @@ class fspathtree:
 
 
   # this is used to allow the same name for instance and static methods
+  def _instance_get_all_paths(self, transform = None, predicate=None):
+    root_path = fspathtree.PathType("")
+    if self.tree == self.root:
+        root_path = fspathtree.PathType("/")
+
+    return fspathtree.get_all_paths(self.tree,transform,predicate,root_path=root_path)
+
   def _instance_get_all_leaf_node_paths(self, transform = None, predicate=None):
     root_path = fspathtree.PathType("")
     if self.tree == self.root:
@@ -177,6 +217,13 @@ class fspathtree:
 
   @staticmethod
   def normalize_path(path,up="..",current="."):
+    '''
+    Return a normalized version of given path.
+    Normalization removes all '..' and '.' elements.
+
+    /one/two/three/../../four  -> /one/four
+    '''
+    path = fspathtree._make_path(path)
     parts = fspathtree._normalize_path_parts( path.parts, up, current)
     if parts is None:
       return None
@@ -190,7 +237,7 @@ class fspathtree:
     path may be specified as a string, Path-like object, or list of path elements.
     '''
     original_path = copy.copy(path)
-    path = fspathtree._make_path(path,normalize_path=False)
+    path = fspathtree._make_path(path)
     # remove the '/' from the beginning of the path if it exists.
     if path.is_absolute():
       path = path.relative_to('/')
@@ -221,7 +268,7 @@ class fspathtree:
     is returned.
     '''
     original_path = copy.copy(path)
-    path = fspathtree._make_path(path,normalize_path=False)
+    path = fspathtree._make_path(path)
     # remove the '/' from the beginning of the path if it exists.
     if path.is_absolute():
       path = path.relative_to('/')
@@ -241,23 +288,46 @@ class fspathtree:
       raise e
 
   @staticmethod
+  def get_all_paths(node,transform = None ,predicate = None, root_path=PathType()):
+    if transform is False:
+      transform = None
+    return fspathtree._get_all_paths(node,transform,predicate,root_path)
+
+  @staticmethod
   def get_all_leaf_node_paths(node,transform = None ,predicate = None, root_path=PathType()):
+    '''
+    Return a list of all paths that point leaf notes (i.e. point to values)
+
+    `transform` is an optional callable that can be used to transform the paths
+    before returning. This can be used to remove leading '/' for example.
+    Each leaf node path will be passed to `transform(path)` and the return value
+    will be returned.
+
+    `predicate` is an optional callable that can be used to determine if the path
+    should be returned. This is useful for filting leaf node paths.
+    '''
     if transform is False:
       transform = None
     return fspathtree._get_all_leaf_node_paths(node,transform,predicate,root_path)
 
   @staticmethod
   def find(tree,pattern,as_string=False,root_path=PathType()):
+    """
+    Return all leaf node paths matching `pattern`.
+    """
     return fspathtree.get_all_leaf_node_paths(tree,str if as_string else None,lambda p: p.match(pattern),root_path=root_path)
 
 
   # Private Methods
 
   @staticmethod
-  def _make_path(key,normalize_path=False):
+  def _make_path(key):
     '''
     Given a string, bytes array, integer, or list of path elements;  return a PathType object representing the path.
     '''
+    if type(key) == fspathtree.PathType:
+        return key
+
     if type(key) in (list,tuple):
       path = fspathtree.PathType(*key)
     else:
@@ -268,10 +338,6 @@ class fspathtree:
         key = str(key)
       path = fspathtree.PathType(key)
 
-    if normalize_path:
-      path = fspathtree.normalize_path(path)
-      if path is None:
-        raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
 
     return path
 
@@ -421,20 +487,12 @@ class fspathtree:
 
 
   @staticmethod
-  def _get_all_leaf_node_paths(node, transform = None, predicate = None, root_path=PathType()):
+  def _get_all_paths(node, transform = None, predicate = None, root_path=PathType()):
     '''
-    Returns a list containing the paths to all leaf nodes in the tree.
+    Return a list of all paths in the tree.
     '''
-    if not fspathtree.is_leaf(root_path,node):
-      try:
-        for i in range(len(node)):
-          yield from fspathtree._get_all_leaf_node_paths( node[i], transform, predicate, root_path / str(i))
-      except:
-        for k in node:
-          yield from fspathtree._get_all_leaf_node_paths( node[k], transform, predicate, root_path / k)
-    else:
-      return_path = True
-      if predicate is not None:
+    return_path = True
+    if predicate is not None:
         num_args = len(signature(predicate).parameters)
         if num_args  == 1:
           return_path = predicate(root_path)
@@ -443,9 +501,9 @@ class fspathtree:
         else:
           raise RuntimeError(f"fspathtree: Predicate function not supported. Predicates may take 1 or 2 arguments. Provided function takes {num_args}.")
 
-      if return_path:
+    if return_path:
         if transform is None:
-          yield root_path
+            yield root_path
         elif type(transform) == type:
           yield transform(root_path)
         else:
@@ -456,6 +514,34 @@ class fspathtree:
             yield transform(root_path,node)
           else:
             raise RuntimeError(f"fspathtree: Transform function not supported. Transforms may take 1 or 2 arguments. Provided function takes {num_args}.")
+
+    if not fspathtree.is_leaf(node):
+      try:
+        for i in range(len(node)):
+          yield from fspathtree._get_all_paths( node[i], transform, predicate, root_path / str(i))
+      except:
+        for k in node:
+          yield from fspathtree._get_all_paths( node[k], transform, predicate, root_path / k)
+
+
+  @staticmethod
+  def _get_all_leaf_node_paths(node, transform = None, predicate = None, root_path=PathType()):
+    '''
+    Returns a list containing the paths to all leaf nodes in the tree.
+    '''
+    # we can use the _get_all_paths(...) function if just add is_leaf to the predicate.
+    new_predicate = lambda p,n: fspathtree.is_leaf(n)
+    if predicate is not None:
+        num_args = len(signature(predicate).parameters)
+        if num_args  == 1:
+            new_predicate = lambda p,n: fspathtree.is_leaf(n) and predicate(p)
+        elif num_args == 2:
+            new_predicate = lambda p,n: fspathtree.is_leaf(n) and predicate(p,n)
+        else:
+          raise RuntimeError(f"fspathtree: Predicate function not supported. Predicates may take 1 or 2 arguments. Provided function takes {num_args}.")
+
+    for path in fspathtree._get_all_paths(node,transform,new_predicate,root_path):
+        yield path
   
 
 
