@@ -46,7 +46,7 @@ t2 = fspathtree({'one':1})
 t3 = fspathtree(t2)
 ```
 
-Elements in the tree can be tested for presense using the `in` operator. They can be accessed with the
+Elements in the tree can be tested for presence using the `in` operator. They can be accessed with the
 `__call__` operator or the `get(...)` method.
 ```
 t = fspathtree({'one':{'two': 2}})
