@@ -20,6 +20,4 @@ def tests(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """Run th elinter"""
     session.install("pre-commit")
-    session.run(
-        "pre-commit", "run", "--all-file", "--show-diff-on-failure", *session.posargs
-    )
+    session.run("pre-commit", "run", "--all-file", *session.posargs)
