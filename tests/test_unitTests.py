@@ -766,4 +766,3 @@ def test_getting_leaf_nodes():
 
   assert fspathtree.PathType("two") in keys
   assert fspathtree.PathType("nums/0") in keys
-

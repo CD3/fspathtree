@@ -542,7 +542,3 @@ class fspathtree:
 
     for path in fspathtree._get_all_paths(node,transform,new_predicate,root_path):
         yield path
-
-
-
-
