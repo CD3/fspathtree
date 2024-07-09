@@ -36,7 +36,7 @@ class fspathtree:
     self.root = root if root is not None else self.tree
 
     self.abspath = self.PathType(abspath)
-    
+
     if self.tree == self.root and abspath != '/':
       raise RuntimeError("fspathtree: tree initialized with a root, but abspath is not '/'.")
 
@@ -151,7 +151,7 @@ class fspathtree:
 
 
     else:
-    # otherwise, we just use the 
+    # otherwise, we just use the
         self.tree.update(*args,**kwargs)
 
   def path(self):
@@ -423,7 +423,7 @@ class fspathtree:
 
     if path_parts is None:
       raise PathGoesAboveRoot("fspathtree: Key path contains a parent reference (..) that goes above the root of the tree")
-    
+
     fspathtree._setitem_from_path_parts_imp(tree,path_parts,value)
 
 
@@ -542,7 +542,7 @@ class fspathtree:
 
     for path in fspathtree._get_all_paths(node,transform,new_predicate,root_path):
         yield path
-  
+
 
 
 

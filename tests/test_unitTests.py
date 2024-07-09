@@ -297,7 +297,7 @@ def test_readme_example():
   # or reference elements from the root of the tree.
   assert x['/time/N'] == 50
 
-  
+
 def test_get_method():
   d = fspathtree()
   d.update({ 'one': 1,
@@ -534,7 +534,7 @@ def test_updating_multi_level_trees():
         def __init__(self,*args,**kwargs):
             super().__init__(*args,**kwargs)
 
-    
+
     t1 = my_fspathtree({'k1':'v1'})
     t2 = my_fspathtree( {'k2':'v2', 'l1' : {'k1':'v1'}})
 
