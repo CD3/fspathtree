@@ -1,9 +1,11 @@
-import pytest
+import copy
+import pathlib
 import pprint
 import types
-import pathlib
-import copy
-from fspathtree import fspathtree, PathGoesAboveRoot, NodeError, InvalidIndexError
+
+import pytest
+
+from fspathtree import InvalidIndexError, NodeError, PathGoesAboveRoot, fspathtree
 
 
 def test_fspathtree_wrapping_existing_dict():
@@ -787,3 +789,39 @@ def test_getting_leaf_nodes():
 
     assert fspathtree.PathType("two") in keys
     assert fspathtree.PathType("nums/0") in keys
+
+
+def test_various_path_errors():
+    d = {
+        "layers": [{"name": "abs1"}, {"name": "abs2"}],
+        "grid": {"x": {"min": 0, "max": 1}, "y": {"min": 0, "max": 2}},
+    }
+    t = fspathtree(d)
+
+    assert t["layers/0/name"] == "abs1"
+
+    with pytest.raises(KeyError) as e:
+        x = t["grid/0/x"]
+
+    assert (
+        e.value.args[0]
+        == "Could not find path element '0' while parsing path 'grid/0/x'"
+    )
+
+    with pytest.raises(IndexError) as e:
+        x = t["layers/2/name"]
+
+    assert (
+        e.value.args[0]
+        == "Could not find path element '2' while parsing path 'layers/2/name'"
+    )
+
+    assert t["grid/x"]["../../layers/0/name"] == "abs1"
+
+    with pytest.raises(KeyError) as e:
+        assert t["grid/x"]["../layers/0/name"] == "abs1"
+
+    assert (
+        e.value.args[0]
+        == "Could not find path element 'layers' while parsing path '/grid/x/../layers/0/name'"
+    )
