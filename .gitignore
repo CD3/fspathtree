@@ -7,3 +7,5 @@ MANIFEST
 fspathtree.egg-info
 .vim/
 poetry.lock
+requirements-dev.lock
+requirements.lock

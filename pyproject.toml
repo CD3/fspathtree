@@ -1,19 +1,24 @@
-[tool.poetry]
+[project]
 name = "fspathtree"
 version = "1.0"
 description = "A small utility for wrapping trees (nested dict/list) that allows filesystem-like path access, including walking up with \"../\"."
-authors = ["CD Clark III <clifton.clark@gmail.com>"]
-license = "MIT"
+authors = [{name = "CD Clark III",email = "clifton.clark@gmail.com"}]
 readme = "README.md"
+dependencies = []
+requires-python = ">=3.7"
 
-[tool.poetry.dependencies]
-python = ">=3.7"
 
+[tool.rye]
+managed = true
+dev-dependencies = ["pytest>=7.2.0", "pytest-pudb>=0.7.0"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">=7.2.0"
-pytest-pudb = ">=0.7.0"
+[tool.hatch]
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fspathtree"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
