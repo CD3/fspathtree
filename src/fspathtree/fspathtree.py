@@ -1,8 +1,8 @@
-from pathlib import PurePosixPath
-import re
-from inspect import signature
 import collections
 import copy
+import re
+from inspect import signature
+from pathlib import PurePosixPath
 
 
 class PathGoesAboveRoot(Exception):
@@ -13,7 +13,7 @@ class CannotCreateParentNode(Exception):
     pass
 
 
-class InvalidIndexError(Exception):
+class InvalidIndexError(IndexError):
     pass
 
 
@@ -262,15 +262,21 @@ class fspathtree:
 
         try:
             return fspathtree._getitem_from_path_parts(tree, path.parts)
+        # catch exeptions, add some context, and rethrow
         except KeyError as e:
-            msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+            msg = f"Error while parsing path '{original_path}'. Could not find path element '{e.args[0]}'."
             raise KeyError(msg)
+        except (
+            InvalidIndexError
+        ) as e:  # need to check this one first since it is a sub-class of IndexError
+            msg = f"Error while parsing path '{original_path}'. '{e.args[0]}' out of range for Sequence node index."
+            raise InvalidIndexError(msg)
         except IndexError as e:
-            msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+            msg = f"Error while parsing path '{original_path}'. Could not find path element '{e.args[0]}'."
             raise IndexError(msg)
-        except InvalidIndexError as e:
-            msg = f"Error while parsing '{original_path}'." + str(e)
-            raise IndexError(msg)
+        except ValueError as e:
+            msg = f"Error while parsing path '{original_path}'. Could not convert '{e.args[0]}' to an integer for indexing Sequence node."
+            raise ValueError(msg)
         except Exception as e:
             raise e
 
@@ -404,8 +410,8 @@ class fspathtree:
         try:
             return fspathtree.__getitem_from_path_parts_imp(tree, path_parts)
         except UnrecognizedParentNodeType as e:
-            # if at any point during the traversal we run into a node that we cannot figure out
-            # how to subscript. we will throw an UnrecognizedParentNodeType esception. However,
+            # If at any point during the traversal we run into a node that we cannot figure out
+            # how to subscript, we will throw an UnrecognizedParentNodeType esception. However,
             # we don't want to throw that to the caller, becasue it will not have any information
             # about where in the path the error occured. So, we will catch this exception,
             # figure out where it happened, and throw a nicer error.
@@ -418,18 +424,32 @@ class fspathtree:
 
     def __getitem_from_path_parts_imp(tree, path_parts):
         if isinstance(tree, collections.abc.Mapping):
+            # node is a mapping (i.e. is indexed by a string like a dict)
+            # check if node contains the current path_part as a key
             if path_parts[0] in tree:
                 node = tree[path_parts[0]]
             else:
                 raise KeyError(path_parts[0])
         elif isinstance(tree, collections.abc.Sequence):
-            if len(tree) > int(path_parts[0]):
-                node = tree[int(path_parts[0])]
+            # node is a sequence (i.e. is indexed by a string like a list)
+            # check that the path_part is actually an integer
+            try:
+                idx = int(path_parts[0])
+            except:
+                raise ValueError(path_parts[0])
+
+            # check if node contains the current path_part as an index
+            if len(tree) > idx:
+                node = tree[idx]
             else:
-                raise IndexError(path_parts[0])
+                raise InvalidIndexError(idx)
         else:
+            # if it isn't a mapping or sequence, we don't know how to
+            # index it.
             raise UnrecognizedParentNodeType(type(tree), path_parts)
 
+        # the element (appears) to exists.
+        # check to see if it is a leaf node or if we need to keep walking the path.
         if len(path_parts) == 1:
             return node
         else:
