@@ -1,6 +1,6 @@
 [project]
 name = "fspathtree"
-version = "1.1"
+version = "1.1.1"
 description = "A small utility for wrapping trees (nested dict/list) that allows filesystem-like path access, including walking up with \"../\"."
 authors = [{name = "CD Clark III",email = "clifton.clark@gmail.com"}]
 readme = "README.md"
