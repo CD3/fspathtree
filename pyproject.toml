@@ -5,7 +5,7 @@ description = "A small utility for wrapping trees (nested dict/list) that allows
 authors = [{name = "CD Clark III",email = "clifton.clark@gmail.com"}]
 readme = "README.md"
 dependencies = []
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 
 
 [tool.rye]
