@@ -296,14 +296,19 @@ class fspathtree:
         try:
             return fspathtree._setitem_from_path_parts(tree, path.parts, value)
         except KeyError as e:
-            msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
+            msg = f"Error while parsing path '{original_path}'. Could not find path element '{e.args[0]}'."
             raise KeyError(msg)
+        except (
+            InvalidIndexError
+        ) as e:  # need to check this one first since it is a sub-class of IndexError
+            msg = f"Error while parsing path '{original_path}'. '{e.args[0]}' out of range for Sequence node index."
+            raise InvalidIndexError(msg)
         except IndexError as e:
-            msg = f"Could not find path element '{e.args[0]}' while parsing path '{original_path}'"
-            raise KeyError(msg)
-        except InvalidIndexError as e:
-            msg = f"Error while parsing path '{original_path}'. " + str(e)
+            msg = f"Error while parsing path '{original_path}'. Could not find path element '{e.args[0]}'."
             raise IndexError(msg)
+        except ValueError as e:
+            msg = f"Error while parsing path '{original_path}'. Could not convert '{e.args[0]}' to an integer for indexing Sequence node."
+            raise ValueError(msg)
         except Exception as e:
             raise e
 
@@ -408,7 +413,7 @@ class fspathtree:
             )
 
         try:
-            return fspathtree.__getitem_from_path_parts_imp(tree, path_parts)
+            return fspathtree._getitem_from_path_parts_imp(tree, path_parts)
         except UnrecognizedParentNodeType as e:
             # If at any point during the traversal we run into a node that we cannot figure out
             # how to subscript, we will throw an UnrecognizedParentNodeType esception. However,
@@ -422,7 +427,7 @@ class fspathtree:
                 f"Unknown parent node type ({e.node_type}) found at '{'/'.join(error_node_path_parts)}' while traversing path '{'/'.join(path_parts)}'. This likely means you are trying to access an element beyond a current leaf node."
             )
 
-    def __getitem_from_path_parts_imp(tree, path_parts):
+    def _getitem_from_path_parts_imp(tree, path_parts):
         if isinstance(tree, collections.abc.Mapping):
             # node is a mapping (i.e. is indexed by a string like a dict)
             # check if node contains the current path_part as a key
@@ -433,9 +438,9 @@ class fspathtree:
         elif isinstance(tree, collections.abc.Sequence):
             # node is a sequence (i.e. is indexed by a string like a list)
             # check that the path_part is actually an integer
-            try:
+            if path_parts[0].isnumeric():
                 idx = int(path_parts[0])
-            except:
+            else:
                 raise ValueError(path_parts[0])
 
             # check if node contains the current path_part as an index
@@ -453,7 +458,7 @@ class fspathtree:
         if len(path_parts) == 1:
             return node
         else:
-            return fspathtree.__getitem_from_path_parts_imp(node, path_parts[1:])
+            return fspathtree._getitem_from_path_parts_imp(node, path_parts[1:])
 
     @staticmethod
     def _setitem_from_path_parts(tree, path_parts, value):
@@ -463,10 +468,9 @@ class fspathtree:
 
         @param tree           A nested Mapping/Sequenhe (i.e. dict/list) object that is being accessed.
         @param path_parts     A list of path elements identifying the location of the element being accessed.
-        @param _root          Implementation detail. Do not use.
+        @param value          Value to set node at path to.
         """
 
-        # If _root is true, it means this is the _first_ call and we need to normalize the path
         path_parts = fspathtree._normalize_path_parts(path_parts)
 
         if path_parts is None:
@@ -495,15 +499,13 @@ class fspathtree:
                         tree[key], path_parts[1:], value
                     )
 
-        # if the tree is a dict, then add the path as an elment of the list with given index
+        # if the tree is a list, then add the path as an elment of the list with given index
         elif isinstance(tree, collections.abc.Sequence):
             # check that the path element is an integer.
             # if it is not, then we want to convert the list to a dict
             # and tell the caller to try again...
             if not key.isnumeric():
-                raise InvalidIndexError(
-                    f"Non-numeric index '{key}' used to index Sequence node."
-                )
+                raise ValueError(key)
 
             key = int(key)
 

@@ -601,7 +601,7 @@ def test_accessing_and_creating_paths_deeper_than_leaf_nodes():
     assert e_info.type == KeyError
     assert (
         str(e_info.value).strip('"')
-        == "Could not find path element 'l2' while parsing path 'l2'"
+        == "Error while parsing path 'l2'. Could not find path element 'l2'."
     )
 
     with pytest.raises(Exception) as e_info:
@@ -609,7 +609,7 @@ def test_accessing_and_creating_paths_deeper_than_leaf_nodes():
     assert e_info.type == KeyError
     assert (
         str(e_info.value).strip('"')
-        == "Could not find path element 'l3' while parsing path 'l1/l3/l3'"
+        == "Error while parsing path 'l1/l3/l3'. Could not find path element 'l3'."
     )
 
     with pytest.raises(Exception) as e_info:
@@ -617,16 +617,16 @@ def test_accessing_and_creating_paths_deeper_than_leaf_nodes():
     assert e_info.type == KeyError
     assert (
         str(e_info.value).strip('"')
-        == "Could not find path element 'l2' while parsing path 'l1/l2/l2'"
+        == "Error while parsing path 'l1/l2/l2'. Could not find path element 'l2'."
     )
 
     # Or an index error for lists
     with pytest.raises(Exception) as e_info:
         t1["l1/l2/l3/2"]
-    assert e_info.type == IndexError
+    assert e_info.type == InvalidIndexError
     assert (
         str(e_info.value).strip('"')
-        == "Could not find path element '2' while parsing path 'l1/l2/l3/2'"
+        == "Error while parsing path 'l1/l2/l3/2'. '2' out of range for Sequence node index."
     )
 
     t1["l1/l2"] = None
@@ -671,10 +671,10 @@ def test_using_list_and_dict_nodes():
 
     with pytest.raises(Exception) as e_info:
         t1["/l1/l2/val"] = 3
-    assert e_info.type == IndexError
+    assert e_info.type == ValueError
     assert (
         str(e_info.value).strip('"')
-        == "Error while parsing path '/l1/l2/val'. Non-numeric index 'val' used to index Sequence node."
+        == "Error while parsing path '/l1/l2/val'. Could not convert 'val' to an integer for indexing Sequence node."
     )
 
     assert "/l1/l2" in t1
@@ -689,10 +689,10 @@ def test_using_list_and_dict_nodes():
 
     with pytest.raises(Exception) as e_info:
         t1["/val"] = 3
-    assert e_info.type == IndexError
+    assert e_info.type == ValueError
     assert (
         str(e_info.value).strip('"')
-        == "Error while parsing path '/val'. Non-numeric index 'val' used to index Sequence node."
+        == "Error while parsing path '/val'. Could not convert 'val' to an integer for indexing Sequence node."
     )
 
     assert type(t1.tree) == list
